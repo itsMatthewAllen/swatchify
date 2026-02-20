@@ -1,65 +1,5 @@
-
-// // helper to resolve recursive variable definitions, e.g., `--color-border: var(--color-red);`
-// // also allows for fallback colors
-// function resolveValue(
-// 	value: string,
-// 	map: Map<string, string>,
-// 	visited = new Set<string>()
-// ): string | null {
-// 	value = value.trim();
-
-// 	if (!value.startsWith("var(")) {
-// 		return value; // literal value
-// 	}
-
-// 	// Remove "var(" and trailing ")"
-// 	let inner = value.slice(4, -1).trim();
-
-// 	// Parse the first argument (variable name) and the fallback
-// 	let varName = "";
-// 	let fallback: string | undefined;
-// 	let depth = 0;
-// 	let splitIndex = -1;
-
-// 	for (let i = 0; i < inner.length; i++) {
-// 		const c = inner[i];
-// 		if (c === "(") depth++;
-// 		else if (c === ")") depth--;
-// 		else if (c === "," && depth === 0) {
-// 			splitIndex = i;
-// 			break;
-// 		}
-// 	}
-
-// 	if (splitIndex === -1) {
-// 		varName = inner.trim();
-// 	} else {
-// 		varName = inner.slice(0, splitIndex).trim();
-// 		fallback = inner.slice(splitIndex + 1).trim();
-// 	}
-
-// 	// Prevent infinite recursion
-// 	if (visited.has(varName)) {
-// 		if (fallback) return resolveValue(fallback, map, visited);
-// 		return null;
-// 	}
-
-// 	visited.add(varName);
-
-// 	const variableValue = map.get(varName);
-// 	if (variableValue) {
-// 		const resolved = resolveValue(variableValue, map, visited);
-// 		if (resolved) return resolved;
-// 	}
-
-// 	// If variable not defined, resolve fallback
-// 	if (fallback) {
-// 		return resolveValue(fallback, map, visited);
-// 	}
-
-// 	return null;
-// }
-
+import { selectorMatches } from "./helper";
+import { calculateSpecificity, compareSpecificity } from "./specificity";
 
 export interface VariableDeclaration {
     name: string;
@@ -73,6 +13,7 @@ export function resolveVariableAtPosition(
 	name: string,
 	varDeclarations: VariableDeclaration[],
 	positionOffset: number,
+    usageSelector: string | null,
 	visited = new Set<string>()
 ): string | null {
 	// prevent infinite recursion
@@ -81,16 +22,32 @@ export function resolveVariableAtPosition(
 	}
 	visited.add(name);
 
-	// filter declarations above positionOffset
-	const candidates = varDeclarations
-		.filter(d => d.name === name && d.startOffset <= positionOffset);
+    // find candidates in scope
+    const candidates = varDeclarations.filter(d => 
+        d.name === name &&
+        d.startOffset <= positionOffset
+    );
 
 	if (candidates.length === 0) {
 		return null;
 	}
 
-	// pick the *last* declaration (closest in cascade)
-	const decl = candidates[candidates.length - 1];
+    // pick declaration w/highest specificity
+    let best = candidates[0];
+    let bestSpec = calculateSpecificity(best.selector ?? null);
+
+    for (const candidate of candidates.slice(1)) {
+        const spec = calculateSpecificity(candidate.selector ?? null);
+
+        const cmp = compareSpecificity(spec, bestSpec);
+
+        if (cmp > 0 || (cmp === 0 && candidate.startOffset > best.startOffset)) {
+            best = candidate;
+            bestSpec = spec;
+        }
+    }
+
+    const decl = best;
 
 	const varMatch = decl.value.match(/^var\(\s*(--[\w-]+)\s*(?:,\s*(.+))?\)$/);
 
@@ -101,8 +58,15 @@ export function resolveVariableAtPosition(
 	const innerName = varMatch[1];
 	const fallbackRaw = varMatch[2]?.trim();
 
+    const innerPosition = decl.startOffset;
+
     // resolve inner variable recursively
-    const resolvedInner = resolveVariableAtPosition(innerName, varDeclarations, decl.startOffset, new Set(visited));
+    const resolvedInner = resolveVariableAtPosition(
+        innerName,
+        varDeclarations,
+        innerPosition,
+        decl.selector ?? usageSelector,
+        new Set(visited));
 
     if (resolvedInner) {
         return resolvedInner;
@@ -112,7 +76,12 @@ export function resolveVariableAtPosition(
     if (fallbackRaw) {
         // check if fallback is var()
         if (fallbackRaw.startsWith("var(")) {
-            return resolveVariableAtPositionFromString(fallbackRaw, varDeclarations, decl.startOffset, visited);
+            return resolveVariableAtPositionFromString(
+                fallbackRaw, 
+                varDeclarations, 
+                innerPosition,
+                usageSelector, 
+                visited);
         } else {
             return fallbackRaw;
         }
@@ -126,6 +95,7 @@ export function resolveVariableAtPositionFromString(
     varString: string,
     varDeclarations: VariableDeclaration[],
     positionOffset: number,
+    usageSelector: string | null,
     visited: Set<string>
 ): string | null {
     const match = varString.match(/^var\(\s*(--[\w-]+)\s*(?:,\s*(.+))?\)$/);
@@ -136,14 +106,24 @@ export function resolveVariableAtPositionFromString(
     const innerName = match[1].trim();
     const fallbackRaw = match[2]?.trim();
 
-    const resolvedInner = resolveVariableAtPosition(innerName, varDeclarations, positionOffset, new Set(visited));
+    const resolvedInner = resolveVariableAtPosition(
+        innerName,
+        varDeclarations,
+        positionOffset,
+        usageSelector,
+        visited);
     if (resolvedInner) {
         return resolvedInner;
     }
 
     if (fallbackRaw) {
         if (fallbackRaw.startsWith("var(")) {
-            return resolveVariableAtPositionFromString(fallbackRaw, varDeclarations, positionOffset, visited);
+            return resolveVariableAtPositionFromString(
+                fallbackRaw,
+                varDeclarations,
+                positionOffset,
+                usageSelector,
+                visited);
         } else {
             return fallbackRaw;
         }

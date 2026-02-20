@@ -1,26 +1,4 @@
 
-// handles commas, spaces, and slash alpha values
-// export function splitColorArgs(input: string) {
-// 	let alpha: number | null = null;
-//     input = input.trim();
-
-// 	// split slash alpha
-// 	const parts = input.split("/");
-// 	const mainPart = parts[0].trim();
-// 	if (parts[1]) {
-// 		alpha = parseAlpha(parts[1].trim());
-// 	}
-
-// 	// split main part by comma or spaces
-//     let channels: string[] = [];
-//     if (mainPart.includes(",")) {
-//         channels = mainPart.split(",").map(p => p.trim()).filter(Boolean);
-//     } else {
-//         channels = mainPart.split(/\s+/).map(p => p.trim()).filter(Boolean);
-//     }
-    
-// 	return { channels, alpha };
-// }
 export function splitColorArgs(input: string) {
 	input = input.trim();
 
@@ -102,4 +80,47 @@ export function splitVarArguments(content: string): [string, string | null] {
 		}
 	}
 	return [content, null];
+}
+
+export function findEnclosingSelector(text: string, offset: number): string | null {
+	const blockRegex = /([^{}]+)\{/g;
+	let match: RegExpExecArray | null;
+	let lastSelector: string | null = null;
+
+	while ((match = blockRegex.exec(text))) {
+		if (match.index > offset) {
+			break;
+		}
+		lastSelector = match[1].trim();
+	}
+
+	return lastSelector;
+}
+
+export function selectorMatches(decl: string | undefined, usage: string | null): boolean {
+	if (!decl) {
+		return true;
+	}
+	if (!usage) {
+		return decl === ":root";
+	}
+
+	if (decl === ":root") {
+		return true;
+	}
+	if (decl === usage) {
+		return true;
+	}
+
+	// class match
+	if (decl.startsWith(".") && usage.includes(decl)) {
+		return true;
+	}
+
+	// element match
+	if (!decl.startsWith(".") && !decl.startsWith("#")) {
+		return usage.startsWith(decl);
+	}
+
+	return false;
 }

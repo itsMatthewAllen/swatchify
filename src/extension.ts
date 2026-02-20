@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { parseColor } from './colorParser';
-import { splitColorArgs, parseAlpha, findVarFunctions, splitVarArguments } from './helper';
+import { splitColorArgs, parseAlpha, findVarFunctions, splitVarArguments, findEnclosingSelector } from './helper';
 import { VariableDeclaration, resolveVariableAtPosition, resolveVariableAtPositionFromString } from './variableResolver';
 
 // This method is called when your extension is activated
@@ -30,13 +30,34 @@ export function activate(context: vscode.ExtensionContext) {
 			const definitionRegex = /(--[\w-]+)\s*:\s*((?:[^;()]|\((?:[^()]|\([^()]*\))*\))+)\s*;/g;
 			let defMatch: RegExpExecArray | null;
 
-			while ((defMatch = definitionRegex.exec(text))) {
-				varDeclarations.push({
-					name: defMatch[1],
-					value: defMatch[2].trim(),
-					startOffset: defMatch.index,
-					endOffset: defMatch.index + defMatch[0].length
-				});
+			const blockRegex = /([^{}]+)\{([\s\S]*?)\}/g;
+			
+			let blockMatch: RegExpExecArray | null;
+
+			while ((blockMatch = blockRegex.exec(text))) {
+				const selector = blockMatch[1].trim();
+				const body = blockMatch[2];
+				const blockStart = blockMatch.index + blockMatch[0].indexOf(body);
+
+				let defMatch: RegExpExecArray | null;
+				definitionRegex.lastIndex = 0;
+
+				while ((defMatch = definitionRegex.exec(body))) {
+					const name = defMatch[1];
+					const valueRaw = defMatch[2];
+					const valueTrimmed = valueRaw.trim();
+					// const valueOffsetInMatch = valueRaw.indexOf(valueTrimmed);
+					const startOffset = blockStart + defMatch.index + defMatch[0].indexOf(valueRaw);
+					const endOffset = startOffset + valueRaw.length;
+
+					varDeclarations.push({
+						name,
+						value: valueTrimmed,
+						startOffset,
+						endOffset,
+						selector
+					});
+				}
 			}
 
 			// Pass 1: computed declarations (var(...) inside declarations)
@@ -45,24 +66,26 @@ export function activate(context: vscode.ExtensionContext) {
 					continue;
 				}
 
+				const usageSelector = decl.selector ?? null;
+
 				const resolved = resolveVariableAtPositionFromString(
 					decl.value,
 					varDeclarations,
 					decl.startOffset,
+					usageSelector,
 					new Set()
 				);
 				if (!resolved) {
 					continue;
 				}
 
-				const color = parseColor(resolved);
+				const color = parseColor(resolved.trim());
 				if (!color) {
 					continue;
 				}
 
-				const valueStart = decl.endOffset - decl.value.length - 1;
-				const start = document.positionAt(valueStart);
-				const end = document.positionAt(valueStart + decl.value.length);
+				const start = document.positionAt(decl.startOffset);
+				const end = document.positionAt(decl.endOffset);
 
 				pushColor(new vscode.Range(start, end), color);
 			}
@@ -83,6 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
 						varName,
 						varDeclarations,
 						decl.startOffset,
+						decl.selector ?? null,
 						new Set()
 					) ?? (
 						fallbackRaw
@@ -90,6 +114,7 @@ export function activate(context: vscode.ExtensionContext) {
 								fallbackRaw.trim(),
 								varDeclarations,
 								decl.startOffset,
+								decl.selector ?? null,
 								new Set()
 							) : null
 					);
@@ -98,15 +123,13 @@ export function activate(context: vscode.ExtensionContext) {
 						continue;
 					}
 
-					const color = parseColor(resolvedValue);
+					const color = parseColor(resolvedValue.trim());
 					if (!color) {
 						continue;
 					}
 
-					const valueStart = decl.endOffset - decl.value.length - 1;
-
-					const absoluteStart = valueStart + v.start;
-					const absoluteEnd = valueStart + v.end;
+					const absoluteStart = decl.startOffset + v.start;
+					const absoluteEnd = decl.startOffset + v.end;
 
 					const range = new vscode.Range(
 						document.positionAt(absoluteStart),
@@ -129,10 +152,13 @@ export function activate(context: vscode.ExtensionContext) {
 				const [nameRaw, fallbackRaw] = splitVarArguments(v.content);
 				const varName = nameRaw.trim();
 
+				const usageSelector = findEnclosingSelector(text, v.start);
+
 				let resolvedValue = resolveVariableAtPosition(
 					varName,
 					varDeclarations,
 					v.start,
+					usageSelector,
 					new Set()
 				);
 
@@ -141,6 +167,7 @@ export function activate(context: vscode.ExtensionContext) {
 						fallbackRaw.trim(),
 						varDeclarations,
 						v.start,
+						usageSelector,
 						new Set()
 					);
 				}
