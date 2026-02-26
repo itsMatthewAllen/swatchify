@@ -1,0 +1,3 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`snapshot tests should generate consistent snapshot for a sample file 1`] = `":root { --x: #f00; } .a { color: var(--x); }"`;
