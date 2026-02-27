@@ -1,71 +1,135 @@
-# color-variable-swatches README
+# Swatchify
 
-This is the README for your extension "color-variable-swatches". After writing up a brief description, we recommend including the following sections.
+<p align="center">
+    <img src="images/swatchify-logo.png" alt="Swatchify Logo" style="max-width: 300px;">
+</p>
 
-## Features
+<p style="font-style:italic;" align="center">
+    Color previews for CSS custom properties in Visual Studio Code.
+</p>
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+<p align="center">
+    <a href="https://github.com/itsMatthewAllen/swatchify">GitHub</a> •
+    <a href="https://www.linkedin.com/in/itsmatthewallen/">LinkedIn</a>
+</p>
 
 ---
 
-## Following extension guidelines
+## What is Swatchify?
+Swatchify is a lightweight VS Code extension that scans your stylesheets for
+`var(--*)` expressions and renders a preview swatch next to every resolved
+color.  Instead of guessing which value a variable holds, you can see it
+instantly in the editor.
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+It works out‑of‑the‑box for **CSS** files and activates on the `css`, `scss`,
+and `less` language modes (SCSS/LESS support is currently identical to CSS;
+see Roadmap for enhancements).
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
 
-## Working with Markdown
+## Features
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+- ✅ **Live color swatches** next to any `var(--…)` usage.
+- 📦 **Fallback support** – sees inside nested `var()` and cascades correctly.
+- 🔄 **Cascade‑aware** – respects specificity, scope, and media queries.
+- 🔁 **Fast caching** for large stylesheets.
+- 🧩 Works in **VS Code, SCSS and LESS** documents, with more language
+  compatibility planned.
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+---
 
-## For more information
+<p align="center">
+    <img src="images/example-swatches.png" alt="Screenshot of variable swatches" style="max-width:800px">
+</p>
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+<p align="center" style="font-style:italic;">
+    Example editor view with swatches next to variable usages.
+</p>
 
-**Enjoy!**
+
+## Installation
+
+1. Visit the [Swatchify marketplace page](https://marketplace.visualstudio.com/items?itemName=itsMatthewAllen.swatchify)
+2. Click **Install** or run `ext install itsMatthewAllen.swatchify` from the
+   command palette.
+3. Reload the editor if prompted.
+
+_(Alternatively, clone the repo and press `F5` in VS Code to run a dev
+instance.)_
+
+
+## Usage
+
+Open any stylesheet containing CSS custom properties and `var()` uses.
+Swatches should appear before all `var()` uses.  The extension does not
+add any settings by default, but color previews can be disabled via
+`editor.colorDecorators` or by uninstalling.
+
+
+## Extension Settings
+
+This extension does not currently expose any configuration options.  Future
+releases may add controls for enabling/disabling specific languages or tuning
+performance.
+
+
+## Supported Languages
+
+- CSS (fully supported)
+- SCSS (falls back to CSS parsing; does *not* understand nested rules or
+  variables that are SCSS‑specific)
+- LESS (same as SCSS)
+
+> **Note:** SCSS/LESS activation is included to catch users working in those
+> modes, but the resolver treats files as plain CSS.  See the roadmap for a
+> plan to implement deeper language‑specific parsing.
+
+
+## Roadmap & Future Log
+
+* **v0.2.0** – add real SCSS/LESS parser, respect nesting and mixins
+* **v0.3.0** – workspace‑wide variable resolution across multiple files
+* **v0.4.0** – performance optimizations, support for other languages
+* **v1.0.0** – stable release, publish on Marketplace
+
+Additional ideas:
+
+* Command to show all definitions of a CSS variable
+* Configuration panel for color format (RGB/HEX/HSL)
+
+
+## Changelog
+
+The project follows [Semantic Versioning](https://semver.org/).
+
+### [0.1.0] – 2026‑02‑27
+- Initial public release
+- Core resolver, cascade/scoping, media‑query handling
+- Jest test suite with 50+ tests
+- Activation on CSS/SCSS/LESS modes
+
+
+## Contributing
+
+Contributions are welcome!  Please file issues or pull requests on
+[GitHub](https://github.com/itsMatthewAllen/swatchify).  See the included
+`test/` directory for examples of how the code is structured.
+
+
+## License
+
+MIT © Matthew Allen
+
+
+---
+
+*Swatchify* is maintained by [itsMatthewAllen](https://github.com/itsMatthewAllen).
+Stay in touch:
+
+- GitHub: https://github.com/itsMatthewAllen
+- LinkedIn: https://www.linkedin.com/in/itsmatthewallen/
+
+---
+
+<p align="center" style="margin-top: 50px;">
+    <img src="images/swatchify-demo.gif" alt="Animation of extension in action" style="max-width: 350px" />
+</p>
