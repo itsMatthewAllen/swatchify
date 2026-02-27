@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { parseColor } from "../colorParser";
-import { findEnclosingSelector } from "../helper";
+import { findEnclosingSelector, splitVarArguments } from "../helper";
 import { VarUsage } from "./collectVarUsages";
 import { VariableDeclarationMap } from "../variableIndex";
 import { VariableResolver } from "../variableResolver";
@@ -30,8 +30,14 @@ export function buildColorInformations(
 
         const usageSelector = findEnclosingSelector(text, usage.start);
 
-        const resolved = resolver.resolve(
-            usage.content,
+        // Extract variable name and fallback from usage content
+        // E.g., "--missing, rgb(255, 0, 0)" -> ["--missing", " rgb(255, 0, 0)"]
+        const [varName, fallback] = splitVarArguments(usage.content);
+
+        // Try to resolve the variable with fallback support
+        let resolved = resolver.resolveWithFallback(
+            varName.trim(),
+            fallback,
             usage.start,
             usageSelector
         );

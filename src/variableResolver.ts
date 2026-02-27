@@ -31,6 +31,43 @@ export class VariableResolver {
         return result;
     }
 
+    /**
+     * Resolve a var() with optional fallback.
+     * If the variable cannot be resolved, attempts to resolve the fallback.
+     */
+    resolveWithFallback(
+        name: string,
+        fallback: string | null,
+        positionOffset: number,
+        usageSelector: string | null
+    ): string | null {
+        // First try to resolve the variable
+        const resolved = this.resolve(name, positionOffset, usageSelector);
+        if (resolved !== null) {
+            return resolved;
+        }
+
+        // If variable not found and fallback exists, resolve the fallback
+        if (fallback) {
+            // Recursively resolve the fallback in case it contains var()
+            return this.fallbackResolveValueString(fallback.trim(), positionOffset, usageSelector);
+        }
+
+        return null;
+    }
+
+    /**
+     * Helper to resolve var() expressions within a fallback string.
+     * Public version compatible with the fallback resolution logic.
+     */
+    fallbackResolveValueString(
+        value: string,
+        positionOffset: number,
+        usageSelector: string | null
+    ): string | null {
+        return this.resolveValueString(value, positionOffset, usageSelector, new Set());
+    }
+
     // ================= CORE RESOLUTION =================
 
     private resolveVariable(
@@ -191,8 +228,10 @@ export class VariableResolver {
             console.log("Resolved to:", resolved);
 
             if (resolved === null) {
-                index = endIndex;
-                continue;
+                // BUG FIX: If a var() cannot be resolved (cycled, not found, etc),
+                // the entire value becomes invalid per CSS spec.
+                console.log("Failed to resolve var(), entire value is invalid");
+                return null;
             }
 
             result = result.slice(0, varStart) + resolved + result.slice(endIndex);
