@@ -13,19 +13,16 @@ export class VariableResolver {
     /**
      * Resolve a variable usage at a given document offset and selector
      */
-    resolve(name: string, positionOffset: number, usageSelector: string | null): string | null {
+    resolve(name: string, positionOffset: number, usageSelector: string | null, usageMedia: string | null = null): string | null {
+        // optional debug entry when DEBUG_NAME matches (no logging by default)
         if (name === this.DEBUG_NAME) {
-            console.log("\n=== RESOLVE START ===");
-            console.log("Name:", name);
-            console.log("Offset:", positionOffset);
-            console.log("Selector:", usageSelector);
+            // silence
         }
 
-        const result = this.resolveVariable(name, positionOffset, usageSelector, new Set());
+        const result = this.resolveVariable(name, positionOffset, usageSelector, usageMedia, new Set());
 
         if (name === this.DEBUG_NAME) {
-            console.log("FINAL RESULT:", result);
-            console.log("=== RESOLVE END ===\n");
+            // silence
         }
 
         return result;
@@ -39,10 +36,11 @@ export class VariableResolver {
         name: string,
         fallback: string | null,
         positionOffset: number,
-        usageSelector: string | null
+        usageSelector: string | null,
+        usageMedia: string | null = null
     ): string | null {
         // First try to resolve the variable
-        const resolved = this.resolve(name, positionOffset, usageSelector);
+        const resolved = this.resolve(name, positionOffset, usageSelector, usageMedia);
         if (resolved !== null) {
             return resolved;
         }
@@ -50,7 +48,7 @@ export class VariableResolver {
         // If variable not found and fallback exists, resolve the fallback
         if (fallback) {
             // Recursively resolve the fallback in case it contains var()
-            return this.fallbackResolveValueString(fallback.trim(), positionOffset, usageSelector);
+            return this.fallbackResolveValueString(fallback.trim(), positionOffset, usageSelector, usageMedia);
         }
 
         return null;
@@ -63,9 +61,10 @@ export class VariableResolver {
     fallbackResolveValueString(
         value: string,
         positionOffset: number,
-        usageSelector: string | null
+        usageSelector: string | null,
+        usageMedia: string | null
     ): string | null {
-        return this.resolveValueString(value, positionOffset, usageSelector, new Set());
+        return this.resolveValueString(value, positionOffset, usageSelector, new Set(), usageMedia);
     }
 
     // ================= CORE RESOLUTION =================
@@ -74,9 +73,10 @@ export class VariableResolver {
         name: string,
         positionOffset: number,
         usageSelector: string | null,
+        usageMedia: string | null,
         visited: Set<string>
     ): string | null {
-        const cacheKey = `${name}|${positionOffset}|${usageSelector ?? ""}`;
+        const cacheKey = `${name}|${positionOffset}|${usageSelector ?? ""}|${usageMedia ?? ""}`;
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey) ?? null;
         }
@@ -88,31 +88,25 @@ export class VariableResolver {
         const candidates = this.map.get(name);
         
         if (name === this.DEBUG_NAME) {
-            console.log("DEBUG: Looking for", name);
-            console.log("DEBUG: Found candidates:", candidates?.length ?? 0);
-            if (candidates) {
-                console.log("DEBUG: Candidates are:", candidates.map(c => ({
-                    value: c.value,
-                    selector: c.selector,
-                    startOffset: c.startOffset
-                })));
-            }
+            // debug stub
         }
         
         if (!candidates || candidates.length === 0) {
             if (name === this.DEBUG_NAME) {
-                console.log("DEBUG: No candidates found, returning null");
+                // debug stub
             }
             return null;
         }
         
         visited.add(name);
 
-        let scoped = this.getScopedDeclarations(candidates, positionOffset);
+        let scoped = this.getScopedDeclarations(candidates, positionOffset)
+            // filter out declarations inside a different media context
+            .filter(d => !d.media || d.media === usageMedia);
         let best: VariableDeclaration | null = null;
 
         if (name === this.DEBUG_NAME) {
-            console.log("DEBUG: Scoped declarations:", scoped.length);
+            // debug stub
         }
 
         if (scoped.length > 0) {
@@ -121,34 +115,33 @@ export class VariableResolver {
 
         if (!best) {
             const rootDecls = candidates.filter(c => c.selector === ':root');
+            // additionally ensure root declarations match media (most are null)
+            const filtered = rootDecls.filter(c => !c.media || c.media === usageMedia);
             if (name === this.DEBUG_NAME) {
-                console.log("DEBUG: No scoped, looking for :root. Found:", rootDecls.length);
+                // debug stub
             }
-            if (rootDecls.length > 0) {
-                best = rootDecls[rootDecls.length - 1]; // last :root declaration
+            if (filtered.length > 0) {
+                best = filtered[filtered.length - 1]; // last matching :root declaration
             }
         }
 
         if (!best) {
             if (name === this.DEBUG_NAME) {
-                console.log("DEBUG: Still no best, returning null");
+                // debug stub
             }
             return null;
         }
 
         if (name === this.DEBUG_NAME) {
-            console.log("Chosen declaration:", {
-                value: best.value,
-                start: best.startOffset,
-                selector: best.selector
-            });
+            // debug stub
         }
 
         const resolved = this.resolveValueString(
             best.value,
             best.startOffset,
             best.selector ?? usageSelector,
-            visited
+            visited,
+            usageMedia
         );
 
         this.cache.set(cacheKey, resolved);
@@ -197,15 +190,15 @@ export class VariableResolver {
         value: string,
         positionOffset: number,
         usageSelector: string | null,
-        visited: Set<string>
+        visited: Set<string>,
+        usageMedia: string | null
     ): string | null {
-        console.log("resolveValueString called with:", { value, positionOffset, usageSelector });
-        
+        // resolve value string; debugging available via DEBUG_NAME if needed
         let result = value.trim();
         let index = 0;
 
         if (value.includes(this.DEBUG_NAME)) {
-            console.log("resolveValueString INPUT:", value);
+            // debug stub
         }
         
         while (true) {
@@ -219,29 +212,29 @@ export class VariableResolver {
                 break;
             }
 
-            console.log("Found var() inner:", innerContent);
+            // debug: found var() inner
 
             // ← KEY: Pass the current usageSelector (which is the declaration's selector)
             // to maintain scope context for nested variables
-            const resolved = this.resolveVarExpression(innerContent, positionOffset, usageSelector, visited);
+            const resolved = this.resolveVarExpression(innerContent, positionOffset, usageSelector, visited, usageMedia);
             
-            console.log("Resolved to:", resolved);
+            // debug: resolved to result
 
             if (resolved === null) {
                 // BUG FIX: If a var() cannot be resolved (cycled, not found, etc),
                 // the entire value becomes invalid per CSS spec.
-                console.log("Failed to resolve var(), entire value is invalid");
+                // debug: unresolved var
                 return null;
             }
 
             result = result.slice(0, varStart) + resolved + result.slice(endIndex);
 
-            console.log("Intermediate result:", result);
+            // debug: intermediate result
 
             index = varStart;
         }
 
-        console.log("FINAL RESULT:", result.trim());
+        // debug final result
         return result.trim();
     }
 
@@ -249,20 +242,19 @@ export class VariableResolver {
         content: string,
         positionOffset: number,
         usageSelector: string | null,
-        visited: Set<string>
+        visited: Set<string>,
+        usageMedia: string | null
     ): string | null {
         // split into variable name and fallback
         const commaIndex = this.findTopLevelComma(content);
         const name = commaIndex === -1 ? content.trim() : content.slice(0, commaIndex).trim();
         const fallback = commaIndex === -1 ? null : content.slice(commaIndex + 1).trim();
 
-        console.log("resolveVarExpression:");
-        console.log("  name:", name);
-        console.log("  fallback:", fallback);
+        // debug varExpression content
 
-        const resolved = this.resolveVariable(name, positionOffset, usageSelector, visited);
+        const resolved = this.resolveVariable(name, positionOffset, usageSelector, usageMedia, visited);
         
-        console.log("  resolved primary:", resolved);
+        // debug resolved primary
 
         if (resolved !== null) {
             return resolved;
@@ -270,9 +262,9 @@ export class VariableResolver {
 
         // fallback is attempted only if the main variable fails
         if (fallback) {
-            console.log("  attempting fallback...");
+            // debug attempting fallback
             // Recursively resolve the fallback (it might be another var() or a raw color)
-            return this.resolveValueString(fallback, positionOffset, usageSelector, visited);
+            return this.resolveValueString(fallback, positionOffset, usageSelector, visited, usageMedia);
         }
 
         return null;

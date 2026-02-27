@@ -82,7 +82,19 @@ export function splitVarArguments(content: string): [string, string | null] {
 	return [content, null];
 }
 
-export function findEnclosingSelector(text: string, offset: number): string | null {
+export interface SelectorContext {
+	selector: string | null;
+	media: string | null;
+}
+
+/**
+ * Return the selector and media query (if any) that enclose the given
+ * offset.  The media query returned is simply the name of the last
+ * `@media` block whose braces surround the offset; the condition itself
+ * is never evaluated.
+ */
+export function findEnclosingSelector(text: string, offset: number): SelectorContext {
+	// find last simple selector before offset
 	const blockRegex = /([^{}]+)\{/g;
 	let match: RegExpExecArray | null;
 	let lastSelector: string | null = null;
@@ -94,7 +106,42 @@ export function findEnclosingSelector(text: string, offset: number): string | nu
 		lastSelector = match[1].trim();
 	}
 
-	return lastSelector;
+	// determine media context separately
+	const media = findMediaSelectorAtOffset(text, offset);
+
+	return { selector: lastSelector, media };
+}
+
+/**
+ * Scan the text for `@media` blocks and return the selector of the block
+ * that contains `offset`, if any.  Does not attempt to evaluate the
+ * media condition.
+ */
+export function findMediaSelectorAtOffset(text: string, offset: number): string | null {
+	const mediaRegex = /@media[^{}]*\{/g;
+	let match: RegExpExecArray | null;
+	let result: string | null = null;
+
+	while ((match = mediaRegex.exec(text))) {
+		const sel = match[0].slice(0, -1).trim();
+		const start = match.index;
+		let depth = 1;
+		let i = mediaRegex.lastIndex;
+
+		// walk forward to find matching closing brace
+		while (i < text.length && depth > 0) {
+			if (text[i] === "{") depth++;
+			else if (text[i] === "}") depth--;
+			i++;
+		}
+
+		const end = i;
+		if (offset >= start && offset < end) {
+			result = sel;
+		}
+	}
+
+	return result;
 }
 
 export function selectorMatches(decl: string | undefined, usage: string | null): boolean {

@@ -4,6 +4,12 @@ export interface VariableDeclaration {
     startOffset: number;
     endOffset: number;
     selector?: string;
+    // optional media query context in which this declaration appears
+    media?: string | null;
+    // range of the media block (if any) - useful for determining whether a
+    // usage offset lies inside the same media context
+    mediaStart?: number;
+    mediaEnd?: number;
 }
 
 export type VariableDeclarationMap = Map<string, VariableDeclaration[]>;

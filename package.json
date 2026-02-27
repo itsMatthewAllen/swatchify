@@ -1,15 +1,19 @@
 {
-  "name": "color-variable-swatches",
+  "name": "swatchify",
   "publisher": "itsMatthewAllen",
-  "displayName": "color-variable-swatches",
-  "description": "Shows color swatches for CSS variables",
-  "version": "0.0.1",
+  "displayName": "Swatchify - CSS Variable Color Swatches",
+  "description": "Adds color swatches for CSS variables in VSCode,",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.109.0"
   },
   "categories": [
     "Other"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/itsMatthewAllen/swatchify.git"
+  },
   "activationEvents": [
     "onLanguage:css",
     "onLanguage:scss",

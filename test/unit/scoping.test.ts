@@ -1,5 +1,21 @@
 import { VariableResolver } from '../../src/variableResolver';
 import { VariableDeclarationMap } from '../../src/variableIndex';
+import { collectVariableDeclarations } from '../../src/colorProvider/collectDeclarations';
+import { collectVarUsages } from '../../src/colorProvider/collectVarUsages';
+import { buildColorInformations } from '../../src/colorProvider/buildColorInformation';
+
+// minimal TextDocument stub used by several tests
+function fakeDocument(text: string) {
+  return {
+    getText: () => text,
+    positionAt(offset: number) {
+      const lines = text.slice(0, offset).split('\n');
+      const line = lines.length - 1;
+      const char = lines[lines.length - 1].length;
+      return { line, character: char };
+    }
+  } as any;
+}
 
 describe('variable scoping and cascade', () => {
   it('prefers local scope over :root', () => {
@@ -253,5 +269,87 @@ describe('variable scoping and cascade', () => {
     const result = resolver.resolve('--width', 80, '.child');
     // This test documents what actually happens; a future fix may change this
     expect(result).toBe('50px');
+  });
+
+  it('ignores media query declaration when usage is outside of it', () => {
+    const css = `
+      :root { --color1: #ff0000; }
+      @media screen and (min-width: 500px) {
+        body { --color1: #00ff00; }
+      }
+      body { color: var(--color1); }
+    `;
+
+    const decls = collectVariableDeclarations(css).reduce((m, d) => {
+      if (!m.has(d.name)) m.set(d.name, []);
+      m.get(d.name)!.push(d);
+      return m;
+    }, new Map<string, any>());
+
+    const usages = collectVarUsages(css);
+    const doc = fakeDocument(css);
+    const infos = buildColorInformations(doc, css, decls, usages);
+
+    // red should win because usage is outside the media block
+    expect(infos.length).toBe(1);
+    const rgb = infos[0].color;
+    expect(rgb.red * 255).toBeCloseTo(255, 0);
+    expect(rgb.green * 255).toBeCloseTo(0, 0);
+    expect(rgb.blue * 255).toBeCloseTo(0, 0);
+  });
+
+  it('still respects selector specificity even inside the query', () => {
+    const css = `
+      :root { --color1: #ff0000; }
+      @media screen and (min-width: 500px) {
+        body { --color1: #00ff00; }
+        body { color: var(--color1); }
+      }
+    `;
+
+    const decls = collectVariableDeclarations(css).reduce((m, d) => {
+      if (!m.has(d.name)) m.set(d.name, []);
+      m.get(d.name)!.push(d);
+      return m;
+    }, new Map<string, any>());
+
+    const usages = collectVarUsages(css);
+    const doc = fakeDocument(css);
+    const infos = buildColorInformations(doc, css, decls, usages);
+
+    // despite being inside the media query, :root is more specific than body
+    // so the red value still wins
+    expect(infos.length).toBe(1);
+    const rgb = infos[0].color;
+    expect(rgb.red * 255).toBeCloseTo(255, 0);
+    expect(rgb.green * 255).toBeCloseTo(0, 0);
+    expect(rgb.blue * 255).toBeCloseTo(0, 0);
+  });
+
+  it('allows a more specific selector inside media to override :root', () => {
+    const css = `
+      :root { --color1: #ff0000; }
+      @media screen and (min-width: 500px) {
+        body.foo { --color1: #00ff00; }
+        body.foo { color: var(--color1); }
+      }
+    `;
+
+    const decls = collectVariableDeclarations(css).reduce((m, d) => {
+      if (!m.has(d.name)) m.set(d.name, []);
+      m.get(d.name)!.push(d);
+      return m;
+    }, new Map<string, any>());
+
+    const usages = collectVarUsages(css);
+    const doc = fakeDocument(css);
+    const infos = buildColorInformations(doc, css, decls, usages);
+
+    // now the selector body.foo is more specific than :root, so green should win
+    expect(infos.length).toBe(1);
+    const rgb = infos[0].color;
+    expect(rgb.red * 255).toBeCloseTo(0, 0);
+    expect(rgb.green * 255).toBeCloseTo(255, 0);
+    expect(rgb.blue * 255).toBeCloseTo(0, 0);
   });
 });

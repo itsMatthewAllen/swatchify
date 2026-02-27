@@ -28,7 +28,7 @@ export function buildColorInformations(
 
     for (const usage of varUsages) {
 
-        const usageSelector = findEnclosingSelector(text, usage.start);
+        const { selector: usageSelector, media: usageMedia } = findEnclosingSelector(text, usage.start);
 
         // Extract variable name and fallback from usage content
         // E.g., "--missing, rgb(255, 0, 0)" -> ["--missing", " rgb(255, 0, 0)"]
@@ -39,14 +39,15 @@ export function buildColorInformations(
             varName.trim(),
             fallback,
             usage.start,
-            usageSelector
+            usageSelector,
+            usageMedia
         );
 
         if (!resolved) {
             continue;
         }
 
-        console.log("RESOLVED:", usage.content, "=>", resolved);
+        // resolved value for debugging: resolved
 
         const color = parseColor(resolved.trim());
         if (!color) {

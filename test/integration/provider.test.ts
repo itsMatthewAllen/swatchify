@@ -49,18 +49,12 @@ describe('nested fallback swatches (bug reproduction)', () => {
       decls.get(decl.name)!.push(decl);
     });
     
-    console.log('Declarations:', declsArray.map(d => ({ name: d.name, value: d.value })));
     
     const usages = collectVarUsages(css);
-    console.log('Usages found:', usages.length, usages.map(u => ({ start: u.start, end: u.end, content: u.content })));
     
     const doc = fakeDocument(css);
     const infos = buildColorInformations(doc, css, decls, usages);
     
-    console.log('Swatches created:', infos.length);
-    infos.forEach((info, idx) => {
-      console.log(`  Swatch ${idx}: rgb(${Math.round(info.color.red * 255)}, ${Math.round(info.color.green * 255)}, ${Math.round(info.color.blue * 255)})`);
-    });
     
     // Should create 1 swatch (the var() usage resolves to rgb(255, 0, 0))
     expect(infos.length).toBe(1);
@@ -88,18 +82,11 @@ describe('nested fallback swatches (bug reproduction)', () => {
       decls.get(decl.name)!.push(decl);
     });
     
-    console.log('Declarations found:', declsArray.filter(d => d.name.match(/^--color/)).map(d => d.name));
     
     const usages = collectVarUsages(css);
-    console.log('Var usages found:', usages.length);
-    usages.forEach((u, idx) => {
-      console.log(`  Usage ${idx}: content="${u.content.substring(0, 50)}${u.content.length > 50 ? '...' : ''}"`);
-    });
     
     const doc = fakeDocument(css);
     const infos = buildColorInformations(doc, css, decls, usages);
-    
-    console.log('Swatches created:', infos.length);
     
     // BUG: Should create 4 swatches (one for each var() at different levels)
     // Currently only creates 1 (the innermost var(--color3))
@@ -120,15 +107,10 @@ describe('nested fallback swatches (bug reproduction)', () => {
     });
     
     const usages = collectVarUsages(css);
-    console.log('Usages in nested var(--b); --a: var(--b):', usages.length);
-    usages.forEach((u, idx) => {
-      console.log(`  Usage ${idx}: "${u.content}"`);
-    });
     
     const doc = fakeDocument(css);
     const infos = buildColorInformations(doc, css, decls, usages);
     
-    console.log('Swatches:', infos.length);
     
     // Should have 1 swatch for var(--b) usage
     // (var(--b) resolves to #00ff00 which is a valid color)
@@ -150,12 +132,9 @@ describe('nested fallback swatches (bug reproduction)', () => {
     });
     
     const usages = collectVarUsages(css);
-    console.log('Usages found:', usages.length, usages.map(u => u.content));
     
     const doc = fakeDocument(css);
     const infos = buildColorInformations(doc, css, decls, usages);
-    
-    console.log('Swatches created:', infos.length);
     
     // BUG: Outer var(--missing, ...) should also produce a swatch
     // since it resolves to var(--real, #fff) which resolves to #ff0000
